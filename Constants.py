@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from math import pi
-from Vehicle import VehicleEmulation
 from anki import TrackPieceType
 
 @dataclass(slots=True)
@@ -13,7 +12,7 @@ class Constants:
     def curveRadius(roadOffset:int) -> int:
         return 0.5*pi*(roadOffset+280)
     
-    def pieceLength(vehicle: VehicleEmulation) -> int:
+    def pieceLength(vehicle: "VehicleEmulation") -> int:
         match vehicle.current_track_piece.type:
             case TrackPieceType.START:
                 return Constants.StaightLength
@@ -25,5 +24,7 @@ class Constants:
                 return Constants.curveRadius(vehicle.road_offset)
 
     
-    def timeUntilTrackpieceChange(vehicle: VehicleEmulation, distance:int) -> float:
+    def timeUntilTrackpieceChange(vehicle: "VehicleEmulation", distance:int) -> float:
+        if vehicle.speed == 0:
+            return float("inf")
         return distance / vehicle.speed
