@@ -3,15 +3,18 @@ from anki import Vehicle, TrackPiece, BaseLane, TrackPieceType
 from anki.control.vehicle import BatteryState
 import asyncio
 from typing import Optional, Callable
-from Controller import ControllerEmulatior
 from Constants import Constants
-from threading import Event
+from threading import Event, Thread
 from time import sleep, perf_counter
 
 _Callback = Callable[[], None]
 
 def waitingTask(time: int):
-    sleep(time)
+    if time == float("inf"):
+        while(True):
+            sleep(100)
+    else:
+        sleep(time)
 
 def interuptTask(changedEvent:Event):
     changedEvent.wait()
@@ -21,13 +24,17 @@ class VehicleEmulation(Vehicle):
     def __init__(
             self,
             id: int,
-            controller: Optional[ControllerEmulatior]=None,  # Inconsistent, but fixes failing docs
+            controller: Optional["ControllerEmulatior"]=None,  # Inconsistent, but fixes failing docs
             *,
-            battery: BatteryState
+            battery: BatteryState | None = None
     ):
         super().__init__(id,None,None,controller,battery=BatteryState)
-        self._pieceOffset = 0
+        self._is_connected = True
+        
+        self._pieceDistanceLeft = 0
         self._changedEvent = Event()
+        self._VehicleThread = Thread(target=vehicleThread,daemon=True,args=(self,))
+        self._VehicleThread.start()
     
     async def wait_for_track_change(self) -> Optional[TrackPiece]:
         """Waits until the current track piece changes.
@@ -55,6 +62,8 @@ class VehicleEmulation(Vehicle):
         :class:`ConnectionFailedException`
             A generic error occured whilst connection to the supercar
         """
+        await asyncio.sleep(1)#TODO add delay
+        self._is_connected = True
     
     async def disconnect(self) -> bool:
         """Disconnect from the Supercar
@@ -76,7 +85,8 @@ class VehicleEmulation(Vehicle):
         :class:`DisconnectFailedException`
             The attempt to disconnect from the supercar failed for an unspecified reason
         """
-        asyncio.sleep()#TODO: add delay
+        asyncio.sleep(1)#TODO: add delay
+        self._is_connected = False
         return True
 
     async def set_speed(self, speed: int, acceleration: int = 500):
@@ -124,10 +134,9 @@ class VehicleEmulation(Vehicle):
             *,
             target_previous_track_piece_type: TrackPieceType = TrackPieceType.FINISH
         ):
-        asyncio.sleep()#TODO add delay
-        
+        await asyncio.sleep(1)#TODO add delay
         self._position = 0
-        self.stop()
+        await self.stop()
     
     async def ping(self):
         """
@@ -137,13 +146,16 @@ class VehicleEmulation(Vehicle):
         Send a ping to the vehicle
         """
 
-def vehicleThread(vehicle: VehicleEmulation,changedEvent: Event):
+def vehicleThread(vehicle: VehicleEmulation):
     while(vehicle.is_connected):
         time = perf_counter()
-        tasks = (waitingTask(1),interuptTask())
+        oldSpeed = vehicle.speed
+        tasks = (waitingTask(Constants.timeUntilTrackpieceChange(vehicle,vehicle._pieceDistanceLeft)),interuptTask())
         done, _ = asyncio.wait(tasks,return_when=asyncio.FIRST_COMPLETED)
+        print("vehicle action")
         if done is tasks[0]:
             vehicle.map_position = (vehicle.map_position + 1)%len(vehicle.map)
-            vehicle._pieceOffset = Constants.pieceLength()
+            vehicle._pieceDistanceLeft = Constants.pieceLength()
         else:
-            perf_counter - time
+            passedTime = perf_counter - time
+            vehicle._pieceDistanceLeft -= oldSpeed*passedTime
