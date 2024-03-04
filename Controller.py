@@ -1,13 +1,14 @@
 from anki import Controller, TrackPiece
 from typing import Collection, Optional
-from anki.control.scanner import Scanner, BaseScanner
+from anki.control.scanner import BaseScanner
 import asyncio
 from Vehicle import VehicleEmulation
+from Scanner import DummyScanner
 
 
 class ControllerEmulation(Controller):
     def __init__(self, *, timeout: float=10):
-        self.timeout = timeout
+        self.timeout: float = timeout
         self.vehicles: set[VehicleEmulation] = set()
         self.map: Optional[list[TrackPiece]] = None
     
@@ -42,7 +43,10 @@ class ControllerEmulation(Controller):
             A vehicle with the specified id already exists.
             This will only be raised when using a custom id.
         """
-        return VehicleEmulation(self._check_vehicle_id(vehicle_id),self)
+        vehicle = VehicleEmulation(self._check_vehicle_id(vehicle_id),self)
+        vehicle._road_offset = 0
+        self.vehicles.add(vehicle)
+        return vehicle
     
     async def connect_specific(
             self, 
@@ -79,7 +83,7 @@ class ControllerEmulation(Controller):
             A vehicle with the specified id already exists.
             This will only be raised when using a custom id.
         """
-        return VehicleEmulation(self._check_vehicle_id(vehicle_id),self)
+        return await self.connect_one(vehicle_id)
     
     async def connect_many(
             self,
@@ -119,14 +123,19 @@ class ControllerEmulation(Controller):
             A vehicle with the specified id already exists.
             This will only be raised when using a custom id.
         """
-        return tuple(VehicleEmulation(self._check_vehicle_id(None),self) for i in range(0,amount))
+        if vehicle_ids == None:
+            vehicle_ids = []
+        while len(vehicle_ids) < amount:
+            vehicle_ids.append(None)
+
+        return tuple([await self.connect_one(id) for id in vehicle_ids])
     
     async def scan(
             self,
             scan_vehicle: VehicleEmulation|None=None,
             /,
             align_pre_scan: bool=True,
-            scanner_class: type[BaseScanner]=Scanner
+            scanner_class: type[BaseScanner] = DummyScanner
     ) -> list[TrackPiece]:
         """Assembles a digital copy of the map and adds it to every connected vehicle.
         
@@ -159,7 +168,11 @@ class ControllerEmulation(Controller):
             # Since we're aligning BEFORE scan, we need the piece before
             # the one we want to align in front of
             await asyncio.sleep(1)
-        asyncio.sleep()#Todo: add dalay
+        await asyncio.sleep(1)#Todo: add dalay
+        for v in self.vehicles:
+            v._map = self.map
+            v._position = len(self.map) - 1 if v in self.vehicles else 0
+            # Scanner is always one piece ahead
         return self.map
 
     
@@ -168,7 +181,7 @@ class ControllerEmulation(Controller):
         if vehicle_id == None:
             vehicle_id = 1024
             while vehicle_id in vehicle_ids:
-                vehicle_ids += 1
+                vehicle_id += 1
         elif vehicle_id in vehicle_ids:
             raise RuntimeError(f"Duplicate id for vehicle. Id {vehicle_id} already in use.")
         return vehicle_id
