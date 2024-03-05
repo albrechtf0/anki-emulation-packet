@@ -2,23 +2,25 @@ from warnings import warn
 from anki import Vehicle, TrackPiece, BaseLane, TrackPieceType
 from anki.control.vehicle import BatteryState
 import asyncio
+from threading import Thread
 from typing import Optional, Callable
 from Constants import Constants
-from threading import Event, Thread
-from time import sleep, perf_counter
+from time import perf_counter
 
 _Callback = Callable[[], None]
 
-def waitingTask(time: int):
+async def waitingTask(time: int):
     if time == float("inf"):
+        print("Time wait inf")
         while(True):
-            sleep(100)
+            await asyncio.sleep(100)
     else:
-        sleep(time)
+        print(f"Time running: {time}")
+        await asyncio.sleep(time)
+        print(f"time ran out: {time}")
 
-def interuptTask(changedEvent:Event):
-    changedEvent.wait()
-    changedEvent.clear()
+async def interuptTask(waitingTask: asyncio.Task):
+    waitingTask.cancel()
 
 class VehicleEmulation(Vehicle):
     def __init__(
@@ -32,8 +34,8 @@ class VehicleEmulation(Vehicle):
         self._is_connected = True
         
         self._pieceDistanceLeft = 0
-        self._changedEvent = Event()
-        self._VehicleThread = Thread(target=vehicleThread,daemon=True,args=(self,))
+        self._changedEvent = Future()
+        self._VehicleThread = Thread(target=asyncio.run,daemon=True,args=(vehicleThread(self),))
         self._VehicleThread.start()
     
     async def wait_for_track_change(self) -> Optional[TrackPiece]:
@@ -146,16 +148,20 @@ class VehicleEmulation(Vehicle):
         Send a ping to the vehicle
         """
 
-def vehicleThread(vehicle: VehicleEmulation):
+async def vehicleThread(vehicle: VehicleEmulation):
     while(vehicle.is_connected):
         time = perf_counter()
         oldSpeed = vehicle.speed
-        tasks = (waitingTask(Constants.timeUntilTrackpieceChange(vehicle,vehicle._pieceDistanceLeft)),interuptTask())
-        done, _ = asyncio.wait(tasks,return_when=asyncio.FIRST_COMPLETED)
+        print(f"vehicle start action {vehicle.speed}")
+        task = asyncio.create_task(waitingTask(Constants.timeUntilTrackpieceChange(vehicle,vehicle._pieceDistanceLeft)))
+        await task
         print("vehicle action")
-        if done is tasks[0]:
+        if  0:
             vehicle.map_position = (vehicle.map_position + 1)%len(vehicle.map)
-            vehicle._pieceDistanceLeft = Constants.pieceLength()
+            vehicle._pieceDistanceLeft = Constants.pieceLength(vehicle)
         else:
-            passedTime = perf_counter - time
+            passedTime = perf_counter() - time
             vehicle._pieceDistanceLeft -= oldSpeed*passedTime
+            if vehicle._pieceDistanceLeft <= 0:
+                vehicle._pieceDistanceLeft = Constants.pieceLength(vehicle)
+        print(f"distance new {vehicle._pieceDistanceLeft}")
