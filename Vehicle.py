@@ -1,19 +1,27 @@
 from anki import Vehicle, TrackPiece, errors
+from anki.control.controller import Controller
 from anki.control.vehicle import BatteryState, _call_all_soon
 from anki.misc import msg_protocol, const
 import asyncio
 import struct
+from threading import Thread
+from bleak import BleakClient
+from bleak.backends.device import BLEDevice
+from time import sleep
+from PacketEncoder import encodePacket
 
-
-def vehicleTread():
-    while True:
-        pass
 
 class VehicleEmulation(Vehicle):
+    def __init__(self, id: int, device: BLEDevice, client: BleakClient | None = None, controller: Controller | None = None,internalPosition:int = 0 , *, battery: BatteryState):
+        super().__init__(id, device, client, controller, battery=battery)
+        self._internalPosition = internalPosition
+        self._simThread = Thread(target=vehicleTread,daemon=True,args=(self,))
+        self._simThread.start
+    
     async def _Vehicle__send_package(self, payload: bytes):#Overrides Vehicle.__send_package
         """Send a payload to the supercar"""
-        if self._write_chara is None:
-            raise RuntimeError("A command was sent to a vehicle that has not been connected.")
+        #if self._write_chara is None:
+        #    raise RuntimeError("A command was sent to a vehicle that has not been connected.")
         try:
             packetType, content =  msg_protocol.disassemble_packet(payload)
             match packetType:
@@ -78,3 +86,11 @@ class VehicleEmulation(Vehicle):
         """
         self._is_connected = False
         return self._is_connected
+
+
+def vehicleTread(vehicle: VehicleEmulation):
+    while True:
+        sleep(2)
+        vehicle._internalPosition = (vehicle._internalPosition+1)%(len(vehicle._controller._simmulatedTrack)-1) 
+        payload = encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_UPDATE)
+        vehicle._notify_handler(None,payload)

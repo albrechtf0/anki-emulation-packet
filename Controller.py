@@ -6,9 +6,13 @@ import asyncio
 
 from Vehicle import VehicleEmulation
 from Scanner import DummyScanner
+from MapPiece import MapPiece
 
 
 class ControllerEmulation(Controller):
+    def __init__(self,simmulatdTrack , *, timeout: float = 10):
+        super().__init__(timeout=timeout)
+        self._simmulatedTrack: list[MapPiece] = simmulatdTrack
     async def _get_vehicle(
         self,
         vehicle_id: Optional[int]=None,
