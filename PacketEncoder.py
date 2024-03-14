@@ -2,7 +2,7 @@ from anki.misc import msg_protocol, const
 from anki.misc.track_pieces import TrackPieceType
 import struct
 
-def encodePacket(vehicle: "VehicleEmulation",packetType: int) -> bytes:
+def encodePacket(vehicle: "VehicleEmulation",packetType: bytes) -> bytes:
     control:"ControllerEmulation" = vehicle._controller
     match packetType:
         case const.VehicleMsg.CHARGER_INFO:
@@ -18,12 +18,12 @@ def encodePacket(vehicle: "VehicleEmulation",packetType: int) -> bytes:
             payload = struct.pack(
                 "<BBfHB",
                 control._simmulatedTrack[vehicle._internalPosition].trackPiece.loc, 
-                control._simmulatedTrack[vehicle._internalPosition].trackPiece.type, 
-                vehicle.road_offset, 
+                control._simmulatedTrack[vehicle._internalPosition].trackPiece.type.value[0], 
+                vehicle.road_offset if not vehicle.road_offset == None else 0, 
                 vehicle.speed, 
-                control._simmulatedTrack[vehicle._internalPosition].trackPiece.clockwise
+                1 if control._simmulatedTrack[vehicle._internalPosition].trackPiece.clockwise else 0
             )
-            return msg_protocol.assemble_packet(packetType.to_bytes(1,"little"),payload)
+            return msg_protocol.assemble_packet(packetType,payload)
         case const.VehicleMsg.TRACK_PIECE_CHANGE:
             payload = struct.pack(
                 "<bbfBBHbBBBBB",
