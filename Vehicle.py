@@ -91,6 +91,6 @@ class VehicleEmulation(Vehicle):
 def vehicleTread(vehicle: VehicleEmulation):
     while True:
         sleep(2)
-        vehicle._internalPosition = (vehicle._internalPosition+1)%(len(vehicle._controller._simmulatedTrack)-1) 
+        vehicle._internalPosition = (vehicle._internalPosition+1)%(len(vehicle._controller._simmulatedTrack)) 
         payload = encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_UPDATE)
         vehicle._notify_handler(None,payload)
