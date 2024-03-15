@@ -12,11 +12,15 @@ from PacketEncoder import encodePacket
 
 
 class VehicleEmulation(Vehicle):
-    def __init__(self, id: int, device: BLEDevice, client: BleakClient | None = None, controller: Controller | None = None,internalPosition:int = 0 , *, battery: BatteryState):
+    def __init__(self, id: int, 
+                 device: BLEDevice, client: BleakClient | None = None, 
+                 controller: Controller | None = None,
+                 internalPosition:int = 0 , *, battery: BatteryState):
         super().__init__(id, device, client, controller, battery=battery)
         self._internalPosition = internalPosition
+        print("init vehicle")
         self._simThread = Thread(target=vehicleTread,daemon=True,args=(self,))
-        self._simThread.start
+        self._simThread.start()
     
     async def _Vehicle__send_package(self, payload: bytes):#Overrides Vehicle.__send_package
         """Send a payload to the supercar"""
@@ -26,7 +30,7 @@ class VehicleEmulation(Vehicle):
             packetType, content =  msg_protocol.disassemble_packet(payload)
             match packetType:
                 case const.ControllerMsg.SET_SPEED:
-                    speed, accel = struct.unpack_from("<ii",payload)
+                    speed, accel = struct.unpack_from("<hh",content)
                     self._speed = speed
                 case const.ControllerMsg.CHANGE_LANE:
                     (
@@ -35,7 +39,7 @@ class VehicleEmulation(Vehicle):
                         roadCenterOffset,
                         _hopIntent,
                         _tag
-                    ) = struct.unpack_from("<HHfBB",payload)
+                    ) = struct.unpack_from("<HHfBB",content)
                     self._road_offset = roadCenterOffset
                 case const.ControllerMsg.TURN_180:
                     raise NotImplementedError("Turn_180 is not supported jet")
@@ -89,8 +93,13 @@ class VehicleEmulation(Vehicle):
 
 
 def vehicleTread(vehicle: VehicleEmulation):
+    print("Starting thread")
     while True:
         sleep(2)
-        vehicle._internalPosition = (vehicle._internalPosition+1)%(len(vehicle._controller._simmulatedTrack)) 
-        payload = encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_UPDATE)
+        vehicle._internalPosition = (
+            vehicle._internalPosition+1)%(len(vehicle._controller._simmulatedTrack)) 
+        #payload = encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_UPDATE)
+        print("writing", vehicle._internalPosition,"; ", 
+              encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_UPDATE).decode())
+        payload = encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_CHANGE)
         vehicle._notify_handler(None,payload)
