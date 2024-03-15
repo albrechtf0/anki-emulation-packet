@@ -13,7 +13,7 @@ def encodePacket(vehicle: "VehicleEmulation",packetType: bytes) -> bytes:
                 vehicle.battery_state.charging,
                 vehicle.battery_state.full_battery
                 )
-            return msg_protocol.assemble_packet(packetType.to_bytes(1,"little"),payload)
+            return msg_protocol.assemble_packet(packetType,payload)
         case const.VehicleMsg.TRACK_PIECE_UPDATE:
             payload = struct.pack(
                 "<BBfHB",
@@ -29,7 +29,7 @@ def encodePacket(vehicle: "VehicleEmulation",packetType: bytes) -> bytes:
                 "<bbfBBHbBBBBB",
                 0,
                 0,
-                vehicle.road_offset,
+                vehicle.road_offset if not vehicle.road_offset == None else 0,
                 0,
                 0,
                 0,
@@ -40,4 +40,4 @@ def encodePacket(vehicle: "VehicleEmulation",packetType: bytes) -> bytes:
                 0,
                 0
             )
-            return msg_protocol.assemble_packet(packetType.to_bytes(1,"little"),payload)
+            return msg_protocol.assemble_packet(packetType,payload)
