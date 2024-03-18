@@ -17,7 +17,7 @@ async def main():
         MapPiece(TrackPiece(0,TrackPieceType.FINISH,False))
     ]
     async with ControllerEmulation(map) as control:
-        vehicles = await control.connect_many(3)
+        vehicles = await control.connect_many(1)
         await control.scan()
         with ankiUi.Ui(vehicles,control.map,(0,1)) as Ui:
             await vehicles[0].set_speed(200)

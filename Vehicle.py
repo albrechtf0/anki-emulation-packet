@@ -18,6 +18,7 @@ class VehicleEmulation(Vehicle):
                  internalPosition:int = 0 , *, battery: BatteryState):
         super().__init__(id, device, client, controller, battery=battery)
         self._internalPosition = internalPosition
+        self._eventLoop = asyncio.get_running_loop()
         print("init vehicle")
         self._simThread = Thread(target=vehicleTread,daemon=True,args=(self,))
         self._simThread.start()
@@ -94,12 +95,15 @@ class VehicleEmulation(Vehicle):
 
 def vehicleTread(vehicle: VehicleEmulation):
     print("Starting thread")
+    asyncio.set_event_loop(vehicle._eventLoop)
+    print("eventloop", asyncio.get_event_loop().is_running())
     while True:
         sleep(2)
         vehicle._internalPosition = (
             vehicle._internalPosition+1)%(len(vehicle._controller._simmulatedTrack)) 
-        #payload = encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_UPDATE)
-        print("writing", vehicle._internalPosition,"; ", 
-              encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_UPDATE).decode())
+        print("writing", vehicle._internalPosition,"; ") 
+        #      encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_UPDATE).decode())
+        payload = encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_UPDATE)
+        vehicle._notify_handler(None,payload)
         payload = encodePacket(vehicle,const.VehicleMsg.TRACK_PIECE_CHANGE)
         vehicle._notify_handler(None,payload)
